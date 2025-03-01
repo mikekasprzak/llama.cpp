@@ -71,7 +71,8 @@
 #define cudaMalloc hipMalloc
 #define cudaMallocHost(ptr, size) hipHostMalloc(ptr, size, hipHostMallocDefault)
 #define cudaMemcpy hipMemcpy
-#define cudaMemcpyAsync hipMemcpyAsync
+#define cudaMemcpyAsync(dest, src, size, device, stream) hipMemcpy(dest, src, size, device)
+//#define cudaMemcpyAsync hipMemcpyAsync
 #define cudaMemcpyPeerAsync hipMemcpyPeerAsync
 #define cudaMemcpy2DAsync hipMemcpy2DAsync
 #define cudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
