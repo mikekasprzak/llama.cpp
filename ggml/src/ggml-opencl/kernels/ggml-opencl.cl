@@ -28,7 +28,7 @@
 #define REQD_SUBGROUP_SIZE_128 __attribute__((qcom_reqd_sub_group_size("full")))
 #else
 // TODO: do not know how to choose subgroup size on other GPUs.
-#error "Selecting subgroup size is not supported on your device."
+//#error "Selecting subgroup size is not supported on your device."
 #endif
 
 #define QK4_0                   32
@@ -2075,6 +2075,10 @@ inline float block_q_4_0_dot_y(
 #define N_DST 4
 #define N_SIMDGROUP 1
 #define N_SIMDWIDTH 64
+#else
+#define N_DST 4 // each SIMD group works on 4 rows
+#define N_SIMDGROUP 1 // number of SIMD groups in a thread group
+#define N_SIMDWIDTH 32 // assuming SIMD group size is 16
 #endif
 
 inline void mul_vec_q_n_f32(
@@ -2235,6 +2239,10 @@ inline float block_q_4_0_dot_y_v(
 #define N_DST 4
 #define N_SIMDGROUP 1
 #define N_SIMDWIDTH 64
+#else
+#define N_DST 4 // each SIMD group works on 4 rows
+#define N_SIMDGROUP 1 // number of SIMD groups in a thread group
+#define N_SIMDWIDTH 32 // assuming SIMD group size is 16
 #endif
 
 inline void mul_vec_q_n_f32_v(
@@ -2484,6 +2492,10 @@ inline float block_q_4_0_dot_y_flat(
 #define N_DST 4
 #define N_SIMDGROUP 1
 #define N_SIMDWIDTH 64
+#else
+#define N_DST 4 // each SIMD group works on 4 rows
+#define N_SIMDGROUP 1 // number of SIMD groups in a thread group
+#define N_SIMDWIDTH 32 // assuming SIMD group size is 32
 #endif
 
 inline void mul_vec_q_n_f32_flat(
@@ -2651,6 +2663,10 @@ kernel void kernel_mul_mat_q4_0_f32_flat(
 #define N_DST 8
 #define N_SIMDGROUP 1
 #define N_SIMDWIDTH 64
+#else
+#define N_DST 8 // each SIMD group works on 8 rows
+#define N_SIMDGROUP 1 // number of SIMD groups in a thread group
+#define N_SIMDWIDTH 32 // assuming SIMD group size is 32
 #endif
 
 inline void mul_vec_q_n_f32_8x_flat(

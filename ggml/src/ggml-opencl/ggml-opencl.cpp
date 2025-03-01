@@ -52,6 +52,7 @@ bool ggml_cl_compute_forward(ggml_backend_t backend, struct ggml_tensor * tensor
 enum GPU_FAMILY {
     ADRENO,
     INTEL,
+    AMD,
     UNKNOWN,
 };
 
@@ -448,6 +449,8 @@ static ggml_backend_opencl_context * ggml_cl2_init(ggml_backend_dev_t dev) {
         backend_ctx->adreno_wave_size = 64;
     } else if (strstr(default_device->name, "Intel")) {
         backend_ctx->gpu_family = GPU_FAMILY::INTEL;
+    } else if (strstr(default_device->name, "gfx")) {
+	backend_ctx->gpu_family = GPU_FAMILY::AMD;
     } else {
         GGML_LOG_ERROR("Unsupported GPU: %s\n", default_device->name);
         backend_ctx->gpu_family = GPU_FAMILY::UNKNOWN;
@@ -3064,7 +3067,7 @@ static void ggml_cl_mul_mat(ggml_backend_t backend, const ggml_tensor * src0, co
                 GGML_ASSERT(ne11 == ne1);
                 GGML_ASSERT(ne01 == ne0);
 
-                if (backend_ctx->gpu_family == INTEL) {
+                if (backend_ctx->gpu_family == INTEL || backend_ctx->gpu_family == AMD) {
                     nth0 = 16;
                     nth1 = 1;
 
@@ -3075,7 +3078,9 @@ static void ggml_cl_mul_mat(ggml_backend_t backend, const ggml_tensor * src0, co
 
                     kernel = backend_ctx->kernel_mul_mat_q4_0_f32_1d_8x_flat;
                 } else {
-                    GGML_ASSERT(false && "TODO: Unknown GPU");
+                    nth0 = 32;
+                    nth1 = 1;
+                    //GGML_ASSERT(false && "TODO: Unknown GPU");
                 }
 
                 CL_CHECK(clSetKernelArg(kernel,  0, sizeof(cl_mem),   &extra0_q4_0->q));
@@ -3109,6 +3114,12 @@ static void ggml_cl_mul_mat(ggml_backend_t backend, const ggml_tensor * src0, co
                 global_work_size[1] = (size_t)ne11*nth1;
                 global_work_size[2] = (size_t)ne12*ne13;
             }
+            else if (backend_ctx->gpu_family == AMD) {
+                // Set global size for AMD. It uses 32x output values.
+                global_work_size[0] = (size_t)(ne01 + 31)/32*nth0;
+                global_work_size[1] = (size_t)ne11*nth1;
+                global_work_size[2] = (size_t)ne12*ne13;
+            }
 
 #ifdef GGML_OPENCL_PROFILING
             cl_event evt;
@@ -3134,7 +3145,7 @@ static void ggml_cl_mul_mat(ggml_backend_t backend, const ggml_tensor * src0, co
             kernel = backend_ctx->kernel_mul_mat_f32_f32;
             nrows = 4;
 
-            if (backend_ctx->gpu_family == INTEL) {
+            if (backend_ctx->gpu_family == INTEL && backend_ctx->gpu_family == AMD) {
                 nth0 = 32;
                 nth1 = 1;
             } else if (backend_ctx->gpu_family == ADRENO) {
@@ -3171,7 +3182,7 @@ static void ggml_cl_mul_mat(ggml_backend_t backend, const ggml_tensor * src0, co
             break;
         case GGML_TYPE_F16:
             //GGML_ASSERT(ne02 == ne12);
-            if (backend_ctx->gpu_family == INTEL) {
+            if (backend_ctx->gpu_family == INTEL && backend_ctx->gpu_family == AMD) {
                 nth0 = 32;
                 nth1 = 1;
             } else if (backend_ctx->gpu_family == ADRENO) {
@@ -3233,6 +3244,12 @@ static void ggml_cl_mul_mat(ggml_backend_t backend, const ggml_tensor * src0, co
 
                 kernel = backend_ctx->kernel_mul_mat_q4_0_f32_8x_flat;
                 ndst = 8;
+            } else if (backend_ctx->gpu_family == AMD) {
+                nth0 = 32;
+                nth1 = 1;
+
+                kernel = backend_ctx->kernel_mul_mat_q4_0_f32_8x_flat;
+                ndst = 8;
             } else if (backend_ctx->gpu_family == ADRENO) {
                 nth0 = 64;
                 nth1 = 1;
@@ -3269,6 +3286,12 @@ static void ggml_cl_mul_mat(ggml_backend_t backend, const ggml_tensor * src0, co
 
                 kernel = backend_ctx->kernel_mul_mat_q4_0_f32;
                 ndst = 4;
+            } else if (backend_ctx->gpu_family == AMD) {
+                nth0 = 32;
+                nth1 = 1;
+
+                kernel = backend_ctx->kernel_mul_mat_q4_0_f32;
+                ndst = 4;                
             } else if (backend_ctx->gpu_family == ADRENO) {
                 nth0 = 64;
                 nth1 = 1;
@@ -3305,9 +3328,12 @@ static void ggml_cl_mul_mat(ggml_backend_t backend, const ggml_tensor * src0, co
         case GGML_TYPE_Q6_K:
             kernel = backend_ctx->kernel_mul_mv_q6_K_f32;
 
-            if (backend_ctx->gpu_family == INTEL) {
+            if (backend_ctx->gpu_family == INTEL && backend_ctx->gpu_family == AMD) {
                 nth0 = 2;
                 nth1 = 16;
+            } else if (backend_ctx->gpu_family == AMD) {
+                nth0 = 2;
+                nth1 = 32;
             } else if (backend_ctx->gpu_family == ADRENO) {
                 nth0 = 2;
                 nth1 = 64;
@@ -3680,7 +3706,7 @@ static void ggml_cl_soft_max(ggml_backend_t backend, const ggml_tensor * src0, c
     // where a row corresponds to leading dimension.
     int nth = MIN(32, ne00);
 
-    if (backend_ctx->gpu_family == INTEL) {
+    if (backend_ctx->gpu_family == INTEL && backend_ctx->gpu_family == AMD) {
         // This is the same as the initial value.
         nth = MIN(32, ne00);
     }
